@@ -9,8 +9,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "lint": "biome check .",
-    "format": "biome check --write ."
+    "lint": "biome lint .",
+    "format": "biome format --write ."
   },
   "dependencies": {
     "@astrojs/react": "^7.0.0",
