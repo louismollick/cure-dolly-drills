@@ -66,7 +66,7 @@ const TRANSITIVITY_RULES = [
     english: "shut something ↔ be shut",
   },
   {
-    label: "U → E + る = FLIP",
+    label: "U ↔ E + る = FLIP",
     japanese: "沈む → 沈める",
     english: "sink → sink something",
   },
