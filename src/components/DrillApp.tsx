@@ -2,6 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   conjugateGodan,
   GODAN_VERBS,
   PAIR_RULE_LABELS,
@@ -38,6 +44,37 @@ type Feedback = {
 };
 
 const targetKeys = Object.keys(TARGETS) as ConjugationTarget[];
+
+const CONJUGATION_RULE_EXAMPLES: Record<RowKey, { japanese: string; english: string }> = {
+  a: { japanese: "書く → 書かない", english: "write → do not write" },
+  i: { japanese: "書く → 書きます", english: "write → write (polite)" },
+  u: { japanese: "書く", english: "to write" },
+  e: { japanese: "書く → 書ける", english: "write → can write" },
+  o: { japanese: "書く → 書こう", english: "write → let's write" },
+};
+
+const TRANSITIVITY_RULES = [
+  {
+    label: "〜す = OTHER",
+    japanese: "出る → 出す",
+    english: "come out → take something out",
+  },
+  {
+    label: "A-row + る = SELF",
+    japanese: "閉める ↔ 閉まる",
+    english: "shut something ↔ be shut",
+  },
+  {
+    label: "U → E + る = FLIP",
+    japanese: "沈む → 沈める",
+    english: "sink → sink something",
+  },
+  {
+    label: "〜める / 〜べる / 〜てる = OTHER",
+    japanese: "並ぶ → 並べる",
+    english: "line up → arrange things",
+  },
+] as const;
 
 function randomItem<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)];
@@ -82,12 +119,29 @@ function makePairQuestion(previous?: PairQuestion): PairQuestion {
 function ConjugationRules() {
   return (
     <div className="mx-auto grid max-w-3xl grid-cols-5 gap-px bg-zinc-800 text-center">
-      {ROWS.map((row) => (
-        <div className="bg-black px-1 py-2" key={row.key}>
-          <div className="text-base">{row.kana}</div>
-          <div className="mt-0.5 text-[11px] text-zinc-400">{row.label}</div>
-        </div>
-      ))}
+      {ROWS.map((row) => {
+        const example = CONJUGATION_RULE_EXAMPLES[row.key];
+
+        return (
+          <Tooltip key={row.key}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="bg-black px-1 py-2 text-center outline-none focus-visible:bg-zinc-950"
+              >
+                <div className="text-base">{row.kana}</div>
+                <div className="mt-0.5 text-[11px] text-zinc-400">
+                  {row.label}
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="font-medium">{example.japanese}</div>
+              <div className="mt-0.5 text-zinc-400">{example.english}</div>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }
@@ -95,10 +149,22 @@ function ConjugationRules() {
 function PairRules() {
   return (
     <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-zinc-300">
-      <span>〜す = OTHER</span>
-      <span>A-row + る = SELF</span>
-      <span>U → E + る = FLIP</span>
-      <span>〜める / 〜べる / 〜てる = OTHER</span>
+      {TRANSITIVITY_RULES.map((rule) => (
+        <Tooltip key={rule.label}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="border-b border-dotted border-zinc-600 text-zinc-300 outline-none hover:text-white focus-visible:text-white"
+            >
+              {rule.label}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="font-medium">{rule.japanese}</div>
+            <div className="mt-0.5 text-zinc-400">{rule.english}</div>
+          </TooltipContent>
+        </Tooltip>
+      ))}
     </div>
   );
 }
@@ -281,7 +347,8 @@ export default function DrillApp() {
   const attempts = correct + wrong;
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <TooltipProvider>
+      <div className="min-h-screen bg-black text-white">
       <header className="border-b border-zinc-800">
         <div className="mx-auto flex min-h-12 max-w-3xl flex-wrap items-center gap-1 px-3 sm:px-4">
           <Button
@@ -306,7 +373,7 @@ export default function DrillApp() {
             variant="ghost"
             onClick={() => changeMode("pairs")}
           >
-            Pairs
+            Transitivity
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
@@ -448,5 +515,6 @@ export default function DrillApp() {
         </div>
       </main>
     </div>
+    </TooltipProvider>
   );
 }
