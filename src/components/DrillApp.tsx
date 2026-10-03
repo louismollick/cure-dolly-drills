@@ -175,7 +175,7 @@ export default function DrillApp() {
   );
 
   const conjugationOptions = useMemo(() => {
-    const options = ROWS.map((row) => ({
+    const options = ROWS.filter((row) => row.key !== "u").map((row) => ({
       row: row.key,
       rowKana: rowKana(conjugationQuestion.verb, row.key),
       ending: rowEnding(conjugationQuestion.verb, row.key),
@@ -365,7 +365,7 @@ export default function DrillApp() {
               {conjugationQuestion.verb.meaning}
             </div>
 
-            <div className="mt-9 grid grid-cols-5 gap-2">
+            <div className="mt-9 grid grid-cols-4 gap-2">
               {conjugationOptions.map((option, index) => (
                 <Button
                   key={option.row}
