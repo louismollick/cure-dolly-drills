@@ -106,7 +106,7 @@ function PairRules() {
 export default function DrillApp() {
   const [mode, setMode] = useState<Mode>("conjugation");
   const [difficulty, setDifficulty] = useState<Difficulty>("guided");
-  const [rulesOpen, setRulesOpen] = useState(true);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [conjugationQuestion, setConjugationQuestion] = useState(
     makeConjugationQuestion,
   );
@@ -131,6 +131,10 @@ export default function DrillApp() {
     setMode(nextMode);
     setFeedback(null);
     setLocked(false);
+
+    if (nextMode === "conjugation" && difficulty === "guided") {
+      setRulesOpen(false);
+    }
   };
 
   const changeDifficulty = (nextDifficulty: Difficulty) => {
@@ -138,7 +142,10 @@ export default function DrillApp() {
     setDifficulty(nextDifficulty);
     setFeedback(null);
     setLocked(false);
-    setRulesOpen(nextDifficulty === "guided");
+
+    if (nextDifficulty === "guided" && mode === "conjugation") {
+      setRulesOpen(false);
+    }
   };
 
   const finishAnswer = useCallback(
@@ -244,9 +251,7 @@ export default function DrillApp() {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key.toLowerCase() === "r") {
-        if (!(mode === "conjugation" && difficulty === "guided")) {
-          setRulesOpen((value) => !value);
-        }
+        setRulesOpen((value) => !value);
         return;
       }
 
@@ -269,7 +274,6 @@ export default function DrillApp() {
     answerConjugation,
     answerPair,
     conjugationOptions,
-    difficulty,
     mode,
     pairOptions,
   ]);
@@ -326,30 +330,27 @@ export default function DrillApp() {
               <option value="recall">Recall</option>
             </select>
 
-            {!(mode === "conjugation" && difficulty === "guided") && (
-              <Button
-                aria-expanded={rulesOpen}
-                className="h-8 px-2"
-                size="sm"
-                variant="ghost"
-                onClick={() => setRulesOpen((value) => !value)}
-              >
-                Rules
-              </Button>
-            )}
+            <Button
+              aria-expanded={rulesOpen}
+              className="h-8 px-2"
+              size="sm"
+              variant="ghost"
+              onClick={() => setRulesOpen((value) => !value)}
+            >
+              Rules
+            </Button>
           </div>
         </div>
       </header>
 
-      {rulesOpen &&
-        !(mode === "conjugation" && difficulty === "guided") && (
-          <section
-            className="border-b border-zinc-800 px-4 py-3"
-            aria-label="Rules"
-          >
-            {mode === "conjugation" ? <ConjugationRules /> : <PairRules />}
-          </section>
-        )}
+      {rulesOpen && (
+        <section
+          className="border-b border-zinc-800 px-4 py-3"
+          aria-label="Rules"
+        >
+          {mode === "conjugation" ? <ConjugationRules /> : <PairRules />}
+        </section>
+      )}
 
       <main className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
         {mode === "conjugation" ? (
