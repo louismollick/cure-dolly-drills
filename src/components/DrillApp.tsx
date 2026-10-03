@@ -141,32 +141,31 @@ export default function DrillApp() {
     setRulesOpen(nextDifficulty === "guided");
   };
 
-  const finishAnswer = (
-    wasCorrect: boolean,
-    text: string,
-    next: () => void,
-  ) => {
-    if (locked) return;
+  const finishAnswer = useCallback(
+    (wasCorrect: boolean, text: string, next: () => void) => {
+      if (locked) return;
 
-    setLocked(true);
-    setFeedback({ correct: wasCorrect, text });
+      setLocked(true);
+      setFeedback({ correct: wasCorrect, text });
 
-    if (wasCorrect) {
-      setCorrect((value) => value + 1);
-    } else {
-      setWrong((value) => value + 1);
-    }
+      if (wasCorrect) {
+        setCorrect((value) => value + 1);
+      } else {
+        setWrong((value) => value + 1);
+      }
 
-    timeoutRef.current = window.setTimeout(
-      () => {
-        next();
-        setFeedback(null);
-        setLocked(false);
-        timeoutRef.current = null;
-      },
-      wasCorrect ? 650 : 1050,
-    );
-  };
+      timeoutRef.current = window.setTimeout(
+        () => {
+          next();
+          setFeedback(null);
+          setLocked(false);
+          timeoutRef.current = null;
+        },
+        wasCorrect ? 650 : 1050,
+      );
+    },
+    [locked],
+  );
 
   const conjugationOptions = useMemo(() => {
     const options = ROWS.map((row) => ({
@@ -224,7 +223,7 @@ export default function DrillApp() {
           ),
       );
     },
-    [conjugationQuestion, locked],
+    [conjugationQuestion, finishAnswer],
   );
 
   const answerPair = useCallback(
@@ -241,7 +240,7 @@ export default function DrillApp() {
         () => setPairQuestion((current) => makePairQuestion(current)),
       );
     },
-    [locked, pairQuestion],
+    [finishAnswer, pairQuestion],
   );
 
   useEffect(() => {
