@@ -199,8 +199,6 @@ export default function DrillApp() {
 
   const answerConjugation = useCallback(
     (row: RowKey) => {
-      if (locked) return;
-
       const expected = TARGETS[conjugationQuestion.target].row;
       const wasCorrect = row === expected;
       const answer = conjugateGodan(
@@ -228,8 +226,6 @@ export default function DrillApp() {
 
   const answerPair = useCallback(
     (direction: Direction) => {
-      if (locked) return;
-
       const { pair, target } = pairQuestion;
       const wasCorrect = direction === target;
       const answer = target === "self" ? pair.self : pair.other;
