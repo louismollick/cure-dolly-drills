@@ -41,6 +41,7 @@ type PairQuestion = {
 type Feedback = {
   correct: boolean;
   text: string;
+  selected: string;
 };
 
 const targetKeys = Object.keys(TARGETS) as ConjugationTarget[];
@@ -216,11 +217,16 @@ export default function DrillApp() {
   };
 
   const finishAnswer = useCallback(
-    (wasCorrect: boolean, text: string, next: () => void) => {
+    (
+      wasCorrect: boolean,
+      text: string,
+      selected: string,
+      next: () => void,
+    ) => {
       if (locked) return;
 
       setLocked(true);
-      setFeedback({ correct: wasCorrect, text });
+      setFeedback({ correct: wasCorrect, text, selected });
 
       if (wasCorrect) {
         setCorrect((value) => value + 1);
@@ -291,6 +297,7 @@ export default function DrillApp() {
       finishAnswer(
         wasCorrect,
         `${answer} · ${construction}`,
+        row,
         () =>
           setConjugationQuestion((current) =>
             makeConjugationQuestion(current),
@@ -309,6 +316,7 @@ export default function DrillApp() {
       finishAnswer(
         wasCorrect,
         `${answer} · ${PAIR_RULE_LABELS[pair.rule]}`,
+        direction,
         () => setPairQuestion((current) => makePairQuestion(current)),
       );
     },
@@ -456,7 +464,14 @@ export default function DrillApp() {
               {conjugationOptions.map((option, index) => (
                 <Button
                   key={option.row}
-                  className="h-20 min-w-0 flex-col gap-1 px-1"
+                  className={cn(
+                    "h-20 min-w-0 flex-col gap-1 px-1",
+                    locked &&
+                      feedback &&
+                      !feedback.correct &&
+                      feedback.selected === option.row &&
+                      "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
+                  )}
                   disabled={locked}
                   variant="outline"
                   onClick={() => answerConjugation(option.row)}
@@ -510,6 +525,11 @@ export default function DrillApp() {
                   className={cn(
                     "flex-col gap-1",
                     locked ? "h-24" : "h-20",
+                    locked &&
+                      feedback &&
+                      !feedback.correct &&
+                      feedback.selected === option.direction &&
+                      "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
                   )}
                   disabled={locked}
                   variant="outline"
@@ -536,7 +556,7 @@ export default function DrillApp() {
 
         <div className="mt-7 min-h-7 text-center text-sm" aria-live="assertive">
           {feedback && (
-            <span className={feedback.correct ? "text-white" : "text-zinc-300"}>
+            <span className={feedback.correct ? "text-white" : "text-red-400"}>
               {feedback.correct ? "✓" : "✕"} {feedback.text}
             </span>
           )}
