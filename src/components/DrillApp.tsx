@@ -8,8 +8,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  conjugateGodan,
+  conjugateReading,
+  conjugateVerb,
+  conjugationChoice,
+  conjugationDetail,
   GODAN_VERBS,
+  isGodanVerb,
+  NON_GODAN_VERBS,
   PAIR_RULE_LABELS,
   ROWS,
   rowEnding,
@@ -17,7 +22,7 @@ import {
   shuffle,
   TARGETS,
   type ConjugationTarget,
-  type GodanVerb,
+  type ConjugationVerb,
   type RowKey,
   VERB_PAIRS,
   type VerbPair,
@@ -29,7 +34,7 @@ type Difficulty = "guided" | "practice" | "recall";
 type Direction = "self" | "other";
 
 type ConjugationQuestion = {
-  verb: GodanVerb;
+  verb: ConjugationVerb;
   target: ConjugationTarget;
 };
 
@@ -40,19 +45,42 @@ type PairQuestion = {
 
 type Feedback = {
   correct: boolean;
-  text: string;
+  answer: string;
+  reading?: string;
+  detail?: string;
   selected: string;
 };
 
 const targetKeys = Object.keys(TARGETS) as ConjugationTarget[];
 
-const CONJUGATION_RULE_EXAMPLES: Record<RowKey, { japanese: string; english: string }> = {
+const CONJUGATION_RULE_EXAMPLES: Record<
+  RowKey,
+  { japanese: string; english: string }
+> = {
   a: { japanese: "書く → 書かない", english: "write → do not write" },
   i: { japanese: "書く → 書きます", english: "write → write (polite)" },
   u: { japanese: "書く", english: "to write" },
   e: { japanese: "書く → 書ける", english: "write → can write" },
   o: { japanese: "書く → 書こう", english: "write → let's write" },
 };
+
+const NON_GODAN_RULES = [
+  {
+    label: "ICHIDAN: drop る + ない / ます / られる / よう",
+    japanese: "食べる → 食べます",
+    english: "eat → eat (polite)",
+  },
+  {
+    label: "する: しない / します / できる / しよう",
+    japanese: "する → できる",
+    english: "do → can do",
+  },
+  {
+    label: "来る: こない / きます / こられる / こよう",
+    japanese: "来る → 来ます",
+    english: "come → come (polite)",
+  },
+] as const;
 
 const TRANSITIVITY_RULES = [
   {
@@ -83,12 +111,16 @@ function randomItem<T>(items: readonly T[]) {
 
 function makeConjugationQuestion(
   previous?: ConjugationQuestion,
+  difficulty: Difficulty = "guided",
 ): ConjugationQuestion {
   let next: ConjugationQuestion;
 
   do {
+    const useNonGodan = difficulty === "recall" && Math.random() < 0.22;
+    const pool = useNonGodan ? NON_GODAN_VERBS : GODAN_VERBS;
+
     next = {
-      verb: randomItem(GODAN_VERBS),
+      verb: randomItem(pool),
       target: randomItem(targetKeys),
     };
   } while (
@@ -117,54 +149,81 @@ function makePairQuestion(previous?: PairQuestion): PairQuestion {
   return next;
 }
 
+function RuleTooltip({
+  label,
+  japanese,
+  english,
+  className,
+}: {
+  label: string;
+  japanese: string;
+  english: string;
+  className?: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "border-b border-dotted border-zinc-600 text-zinc-300 outline-none hover:text-white focus-visible:text-white",
+            className,
+          )}
+        >
+          {label}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="text-base font-medium">{japanese}</div>
+        <div className="mt-1 text-sm text-zinc-400">{english}</div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function ConjugationRules() {
   return (
-    <div className="mx-auto grid max-w-3xl grid-cols-5 gap-px bg-zinc-800 text-center">
-      {ROWS.map((row) => {
-        const example = CONJUGATION_RULE_EXAMPLES[row.key];
+    <div className="mx-auto max-w-6xl">
+      <div className="grid grid-cols-5 gap-px bg-zinc-800 text-center">
+        {ROWS.map((row) => {
+          const example = CONJUGATION_RULE_EXAMPLES[row.key];
 
-        return (
-          <Tooltip key={row.key}>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="bg-black px-1 py-2 text-center outline-none focus-visible:bg-zinc-950"
-              >
-                <div className="text-base">{row.kana}</div>
-                <div className="mt-0.5 text-[11px] text-zinc-400">
-                  {row.label}
+          return (
+            <Tooltip key={row.key}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="bg-black px-2 py-3 text-center outline-none focus-visible:bg-zinc-950"
+                >
+                  <div className="text-2xl">{row.kana}</div>
+                  <div className="mt-1 text-sm text-zinc-400">{row.label}</div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-base font-medium">{example.japanese}</div>
+                <div className="mt-1 text-sm text-zinc-400">
+                  {example.english}
                 </div>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="font-medium">{example.japanese}</div>
-              <div className="mt-0.5 text-zinc-400">{example.english}</div>
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex flex-wrap justify-center gap-x-7 gap-y-3 text-base">
+        {NON_GODAN_RULES.map((rule) => (
+          <RuleTooltip key={rule.label} {...rule} />
+        ))}
+      </div>
     </div>
   );
 }
 
 function PairRules() {
   return (
-    <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-zinc-300">
+    <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-3 text-base">
       {TRANSITIVITY_RULES.map((rule) => (
-        <Tooltip key={rule.label}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="border-b border-dotted border-zinc-600 text-zinc-300 outline-none hover:text-white focus-visible:text-white"
-            >
-              {rule.label}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="font-medium">{rule.japanese}</div>
-            <div className="mt-0.5 text-zinc-400">{rule.english}</div>
-          </TooltipContent>
-        </Tooltip>
+        <RuleTooltip key={rule.label} {...rule} />
       ))}
     </div>
   );
@@ -210,6 +269,9 @@ export default function DrillApp() {
     setDifficulty(nextDifficulty);
     setFeedback(null);
     setLocked(false);
+    setConjugationQuestion((current) =>
+      makeConjugationQuestion(current, nextDifficulty),
+    );
 
     if (nextDifficulty === "guided" && mode === "conjugation") {
       setRulesOpen(false);
@@ -217,16 +279,31 @@ export default function DrillApp() {
   };
 
   const finishAnswer = useCallback(
-    (
-      wasCorrect: boolean,
-      text: string,
-      selected: string,
-      next: () => void,
-    ) => {
+    ({
+      wasCorrect,
+      answer,
+      reading,
+      detail,
+      selected,
+      next,
+    }: {
+      wasCorrect: boolean;
+      answer: string;
+      reading?: string;
+      detail?: string;
+      selected: string;
+      next: () => void;
+    }) => {
       if (locked) return;
 
       setLocked(true);
-      setFeedback({ correct: wasCorrect, text, selected });
+      setFeedback({
+        correct: wasCorrect,
+        answer,
+        reading,
+        detail,
+        selected,
+      });
 
       if (wasCorrect) {
         setCorrect((value) => value + 1);
@@ -248,13 +325,23 @@ export default function DrillApp() {
   );
 
   const conjugationOptions = useMemo(() => {
-    const options = ROWS.filter((row) => row.key !== "u").map((row) => ({
-      row: row.key,
-      rowKana: rowKana(conjugationQuestion.verb, row.key),
-      ending: rowEnding(conjugationQuestion.verb, row.key),
-      rowLabel: row.kana,
-      meaningLabel: row.label,
-    }));
+    const { verb } = conjugationQuestion;
+
+    const options = isGodanVerb(verb)
+      ? ROWS.filter((row) => row.key !== "u").map((row) => ({
+          row: row.key,
+          rowKana: rowKana(verb, row.key),
+          ending: rowEnding(verb, row.key),
+          rowLabel: row.kana,
+          meaningLabel: row.label,
+        }))
+      : targetKeys.map((target) => ({
+          row: TARGETS[target].row,
+          rowKana: conjugationChoice(verb, target),
+          ending: conjugationChoice(verb, target),
+          rowLabel: TARGETS[target].row,
+          meaningLabel: TARGETS[target].label,
+        }));
 
     return difficulty === "recall" ? shuffle(options) : options;
   }, [conjugationQuestion, difficulty]);
@@ -281,30 +368,23 @@ export default function DrillApp() {
 
   const answerConjugation = useCallback(
     (row: RowKey) => {
-      const expected = TARGETS[conjugationQuestion.target].row;
+      const { verb, target } = conjugationQuestion;
+      const expected = TARGETS[target].row;
       const wasCorrect = row === expected;
-      const answer = conjugateGodan(
-        conjugationQuestion.verb,
-        conjugationQuestion.target,
-      );
-      const sourceKana = conjugationQuestion.verb.ending;
-      const targetKana = rowKana(conjugationQuestion.verb, expected);
-      const suffix = TARGETS[conjugationQuestion.target].suffix;
-      const construction = suffix
-        ? `${sourceKana} → ${targetKana} + ${suffix}`
-        : `${sourceKana} → ${targetKana}`;
 
-      finishAnswer(
+      finishAnswer({
         wasCorrect,
-        `${answer} · ${construction}`,
-        row,
-        () =>
+        answer: conjugateVerb(verb, target),
+        reading: conjugateReading(verb, target),
+        detail: conjugationDetail(verb, target),
+        selected: row,
+        next: () =>
           setConjugationQuestion((current) =>
-            makeConjugationQuestion(current),
+            makeConjugationQuestion(current, difficulty),
           ),
-      );
+      });
     },
-    [conjugationQuestion, finishAnswer],
+    [conjugationQuestion, difficulty, finishAnswer],
   );
 
   const answerPair = useCallback(
@@ -313,12 +393,13 @@ export default function DrillApp() {
       const wasCorrect = direction === target;
       const answer = target === "self" ? pair.self : pair.other;
 
-      finishAnswer(
+      finishAnswer({
         wasCorrect,
-        `${answer} · ${PAIR_RULE_LABELS[pair.rule]}`,
-        direction,
-        () => setPairQuestion((current) => makePairQuestion(current)),
-      );
+        answer,
+        detail: PAIR_RULE_LABELS[pair.rule],
+        selected: direction,
+        next: () => setPairQuestion((current) => makePairQuestion(current)),
+      });
     },
     [finishAnswer, pairQuestion],
   );
@@ -360,209 +441,234 @@ export default function DrillApp() {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-black text-white">
-      <header className="border-b border-zinc-800">
-        <div className="mx-auto flex min-h-12 max-w-3xl flex-wrap items-center gap-1 px-3 sm:px-4">
-          <Button
-            className={cn(
-              "h-12 rounded-none border-b-2 px-2",
-              mode === "conjugation"
-                ? "border-white text-white"
-                : "border-transparent",
-            )}
-            variant="ghost"
-            onClick={() => changeMode("conjugation")}
-          >
-            Conjugation
-          </Button>
-          <Button
-            className={cn(
-              "h-12 rounded-none border-b-2 px-2",
-              mode === "pairs"
-                ? "border-white text-white"
-                : "border-transparent",
-            )}
-            variant="ghost"
-            onClick={() => changeMode("pairs")}
-          >
-            Transitivity
-          </Button>
-
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden text-xs tabular-nums text-zinc-500 sm:inline">
-              {attempts === 0 ? "0/0" : `${correct}/${attempts}`}
-            </span>
-
-            <label className="sr-only" htmlFor="difficulty">
-              Difficulty
-            </label>
-            <select
-              id="difficulty"
-              className="h-8 rounded-sm border border-zinc-700 bg-black px-2 text-xs text-white outline-none focus:border-white"
-              value={difficulty}
-              onChange={(event) =>
-                changeDifficulty(event.target.value as Difficulty)
-              }
-            >
-              <option value="guided">Guided</option>
-              <option value="practice">Practice</option>
-              <option value="recall">Recall</option>
-            </select>
-
-            <label className="sr-only" htmlFor="answer-delay">
-              Delay between questions
-            </label>
-            <select
-              id="answer-delay"
-              aria-label="Delay between questions"
-              title="Delay between questions"
-              className="h-8 rounded-sm border border-zinc-700 bg-black px-2 text-xs text-white outline-none focus:border-white"
-              value={answerDelay}
-              onChange={(event) => setAnswerDelay(Number(event.target.value))}
-            >
-              <option value="650">0.65s</option>
-              <option value="850">0.85s</option>
-              <option value="1200">1.2s</option>
-              <option value="1600">1.6s</option>
-            </select>
-
+        <header className="border-b border-zinc-800">
+          <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-2 px-5 lg:px-8">
             <Button
-              aria-expanded={rulesOpen}
-              className="h-8 px-2"
-              size="sm"
-              variant="ghost"
-              onClick={() => setRulesOpen((value) => !value)}
-            >
-              Rules
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {rulesOpen && (
-        <section
-          className="border-b border-zinc-800 px-4 py-3"
-          aria-label="Rules"
-        >
-          {mode === "conjugation" ? <ConjugationRules /> : <PairRules />}
-        </section>
-      )}
-
-      <main className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-        {mode === "conjugation" ? (
-          <section className="text-center" aria-live="polite">
-            <div className="text-base font-medium">
-              {TARGETS[conjugationQuestion.target].label}
-            </div>
-            <div className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-              {conjugationQuestion.verb.word}
-            </div>
-            <div className="mt-2 text-sm text-zinc-400">
-              {conjugationQuestion.verb.meaning}
-            </div>
-
-            <div className="mt-9 grid grid-cols-4 gap-2">
-              {conjugationOptions.map((option, index) => (
-                <Button
-                  key={option.row}
-                  className={cn(
-                    "h-20 min-w-0 flex-col gap-1 px-1",
-                    locked &&
-                      feedback &&
-                      !feedback.correct &&
-                      feedback.selected === option.row &&
-                      "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
-                  )}
-                  disabled={locked}
-                  variant="outline"
-                  onClick={() => answerConjugation(option.row)}
-                  aria-label={`Answer ${index + 1}: ${option.ending}`}
-                >
-                  {difficulty === "guided" && (
-                    <span className="text-[10px] font-normal text-zinc-500">
-                      {option.rowLabel} · {option.meaningLabel}
-                    </span>
-                  )}
-                  <span className="text-xl font-normal sm:text-2xl">
-                    {difficulty === "guided"
-                      ? option.ending
-                      : option.rowKana}
-                  </span>
-                  <span className="text-[10px] font-normal text-zinc-600">
-                    {index + 1}
-                  </span>
-                </Button>
-              ))}
-            </div>
-          </section>
-        ) : (
-          <section className="text-center" aria-live="polite">
-            <div className="text-base font-medium">
-              {pairQuestion.target === "self"
-                ? pairQuestion.pair.selfGloss
-                : pairQuestion.pair.otherGloss}
-              {difficulty === "guided" && (
-                <span className="text-zinc-500">
-                  {" "}
-                  · {pairQuestion.target.toUpperCase()}
-                </span>
+              className={cn(
+                "h-16 rounded-none border-b-2 px-4 text-lg",
+                mode === "conjugation"
+                  ? "border-white text-white"
+                  : "border-transparent",
               )}
-            </div>
+              variant="ghost"
+              onClick={() => changeMode("conjugation")}
+            >
+              Conjugation
+            </Button>
+            <Button
+              className={cn(
+                "h-16 rounded-none border-b-2 px-4 text-lg",
+                mode === "pairs"
+                  ? "border-white text-white"
+                  : "border-transparent",
+              )}
+              variant="ghost"
+              onClick={() => changeMode("pairs")}
+            >
+              Transitivity
+            </Button>
 
-            <div className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-              {difficulty === "recall" ? `${pairQuestion.pair.stem}＿` : "?"}
-            </div>
+            <div className="ml-auto flex items-center gap-3">
+              <span className="hidden text-sm tabular-nums text-zinc-500 sm:inline">
+                {attempts === 0 ? "0/0" : `${correct}/${attempts}`}
+              </span>
 
-            {difficulty === "guided" && (
-              <div className="mt-3 text-xs text-zinc-500">
-                {PAIR_RULE_LABELS[pairQuestion.pair.rule]}
-              </div>
-            )}
+              <label className="sr-only" htmlFor="difficulty">
+                Difficulty
+              </label>
+              <select
+                id="difficulty"
+                className="h-10 rounded-sm border border-zinc-700 bg-black px-3 text-sm text-white outline-none focus:border-white"
+                value={difficulty}
+                onChange={(event) =>
+                  changeDifficulty(event.target.value as Difficulty)
+                }
+              >
+                <option value="guided">Guided</option>
+                <option value="practice">Practice</option>
+                <option value="recall">Recall</option>
+              </select>
 
-            <div className="mx-auto mt-9 grid max-w-md grid-cols-2 gap-2">
-              {pairOptions.map((option, index) => (
-                <Button
-                  key={option.direction}
-                  className={cn(
-                    "flex-col gap-1",
-                    locked ? "h-24" : "h-20",
-                    locked &&
-                      feedback &&
-                      !feedback.correct &&
-                      feedback.selected === option.direction &&
-                      "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
-                  )}
-                  disabled={locked}
-                  variant="outline"
-                  onClick={() => answerPair(option.direction)}
-                >
-                  <span className="text-2xl font-normal">
-                    {difficulty === "recall"
-                      ? `〜${option.ending}`
-                      : option.word}
-                  </span>
-                  {locked && (
-                    <span className="max-w-full whitespace-normal text-center text-xs font-normal leading-snug text-zinc-400">
-                      {option.gloss}
-                    </span>
-                  )}
-                  <span className="text-[10px] font-normal text-zinc-600">
-                    {index + 1}
-                  </span>
-                </Button>
-              ))}
+              <label className="sr-only" htmlFor="answer-delay">
+                Delay between questions
+              </label>
+              <select
+                id="answer-delay"
+                aria-label="Delay between questions"
+                title="Delay between questions"
+                className="h-10 rounded-sm border border-zinc-700 bg-black px-3 text-sm text-white outline-none focus:border-white"
+                value={answerDelay}
+                onChange={(event) => setAnswerDelay(Number(event.target.value))}
+              >
+                <option value="650">0.65s</option>
+                <option value="850">0.85s</option>
+                <option value="1200">1.2s</option>
+                <option value="1600">1.6s</option>
+              </select>
+
+              <Button
+                aria-expanded={rulesOpen}
+                className="h-10 px-3 text-sm"
+                size="sm"
+                variant="ghost"
+                onClick={() => setRulesOpen((value) => !value)}
+              >
+                Rules
+              </Button>
             </div>
+          </div>
+        </header>
+
+        {rulesOpen && (
+          <section
+            className="border-b border-zinc-800 px-6 py-5"
+            aria-label="Rules"
+          >
+            {mode === "conjugation" ? <ConjugationRules /> : <PairRules />}
           </section>
         )}
 
-        <div className="mt-7 min-h-7 text-center text-sm" aria-live="assertive">
-          {feedback && (
-            <span className={feedback.correct ? "text-white" : "text-red-400"}>
-              {feedback.correct ? "✓" : "✕"} {feedback.text}
-            </span>
+        <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col justify-center px-6 py-10 lg:px-8 lg:py-14">
+          {mode === "conjugation" ? (
+            <section className="text-center" aria-live="polite">
+              <div className="text-[clamp(1.5rem,2.3vw,2.25rem)] font-medium">
+                {TARGETS[conjugationQuestion.target].label}
+              </div>
+              <div className="mt-6 text-[clamp(4rem,8vw,7.5rem)] font-semibold leading-none tracking-tight">
+                {conjugationQuestion.verb.word}
+              </div>
+              <div className="mt-5 text-[clamp(1.15rem,2vw,1.6rem)] text-zinc-400">
+                {conjugationQuestion.verb.meaning}
+              </div>
+
+              <div className="mt-12 grid grid-cols-4 gap-4">
+                {conjugationOptions.map((option, index) => (
+                  <Button
+                    key={option.row}
+                    className={cn(
+                      "h-32 min-w-0 flex-col gap-2 px-2 lg:h-36",
+                      locked &&
+                        feedback &&
+                        !feedback.correct &&
+                        feedback.selected === option.row &&
+                        "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
+                    )}
+                    disabled={locked}
+                    variant="outline"
+                    onClick={() => answerConjugation(option.row)}
+                    aria-label={`Answer ${index + 1}: ${option.ending}`}
+                  >
+                    {difficulty === "guided" && (
+                      <span className="text-sm font-normal text-zinc-500 lg:text-base">
+                        {option.rowLabel} · {option.meaningLabel}
+                      </span>
+                    )}
+                    <span className="text-[clamp(2rem,4vw,3.5rem)] font-normal leading-none">
+                      {difficulty === "guided"
+                        ? option.ending
+                        : option.rowKana}
+                    </span>
+                    <span className="text-xs font-normal text-zinc-600">
+                      {index + 1}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </section>
+          ) : (
+            <section className="text-center" aria-live="polite">
+              <div className="text-[clamp(1.4rem,2.2vw,2rem)] font-medium">
+                {pairQuestion.target === "self"
+                  ? pairQuestion.pair.selfGloss
+                  : pairQuestion.pair.otherGloss}
+                {difficulty === "guided" && (
+                  <span className="text-zinc-500">
+                    {" "}
+                    · {pairQuestion.target.toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-7 text-[clamp(4rem,8vw,7rem)] font-semibold leading-none tracking-tight">
+                {difficulty === "recall" ? `${pairQuestion.pair.stem}＿` : "?"}
+              </div>
+
+              {difficulty === "guided" && (
+                <div className="mt-5 text-lg text-zinc-500">
+                  {PAIR_RULE_LABELS[pairQuestion.pair.rule]}
+                </div>
+              )}
+
+              <div className="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-5">
+                {pairOptions.map((option, index) => (
+                  <Button
+                    key={option.direction}
+                    className={cn(
+                      "flex-col gap-3 px-5",
+                      locked ? "h-44" : "h-36",
+                      locked &&
+                        feedback &&
+                        !feedback.correct &&
+                        feedback.selected === option.direction &&
+                        "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
+                    )}
+                    disabled={locked}
+                    variant="outline"
+                    onClick={() => answerPair(option.direction)}
+                  >
+                    <span className="text-[clamp(2.25rem,4vw,3.5rem)] font-normal leading-none">
+                      {difficulty === "recall"
+                        ? `〜${option.ending}`
+                        : option.word}
+                    </span>
+                    {locked && (
+                      <span className="max-w-full whitespace-normal text-center text-lg font-normal leading-snug text-zinc-400">
+                        {option.gloss}
+                      </span>
+                    )}
+                    <span className="text-xs font-normal text-zinc-600">
+                      {index + 1}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </section>
           )}
-        </div>
-      </main>
-    </div>
+
+          <div
+            className="mt-10 min-h-32 text-center"
+            aria-live="assertive"
+          >
+            {feedback && (
+              <div className={feedback.correct ? "text-white" : "text-red-400"}>
+                <div className="text-[clamp(2rem,4vw,3.5rem)] font-normal leading-tight">
+                  <span className="mr-3">{feedback.correct ? "✓" : "✕"}</span>
+                  {feedback.reading ? (
+                    <ruby>
+                      {feedback.answer}
+                      <rt className="text-[0.38em] text-zinc-400">
+                        {feedback.reading}
+                      </rt>
+                    </ruby>
+                  ) : (
+                    feedback.answer
+                  )}
+                </div>
+                {feedback.detail && (
+                  <div
+                    className={cn(
+                      "mt-4 text-lg",
+                      feedback.correct ? "text-zinc-400" : "text-red-300",
+                    )}
+                  >
+                    {feedback.detail}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </TooltipProvider>
   );
 }
