@@ -244,7 +244,9 @@ export default function DrillApp() {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key.toLowerCase() === "r") {
-        setRulesOpen((value) => !value);
+        if (!(mode === "conjugation" && difficulty === "guided")) {
+          setRulesOpen((value) => !value);
+        }
         return;
       }
 
@@ -267,6 +269,7 @@ export default function DrillApp() {
     answerConjugation,
     answerPair,
     conjugationOptions,
+    difficulty,
     mode,
     pairOptions,
   ]);
@@ -323,24 +326,30 @@ export default function DrillApp() {
               <option value="recall">Recall</option>
             </select>
 
-            <Button
-              aria-expanded={rulesOpen}
-              className="h-8 px-2"
-              size="sm"
-              variant="ghost"
-              onClick={() => setRulesOpen((value) => !value)}
-            >
-              Rules
-            </Button>
+            {!(mode === "conjugation" && difficulty === "guided") && (
+              <Button
+                aria-expanded={rulesOpen}
+                className="h-8 px-2"
+                size="sm"
+                variant="ghost"
+                onClick={() => setRulesOpen((value) => !value)}
+              >
+                Rules
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
-      {rulesOpen && (
-        <section className="border-b border-zinc-800 px-4 py-3" aria-label="Rules">
-          {mode === "conjugation" ? <ConjugationRules /> : <PairRules />}
-        </section>
-      )}
+      {rulesOpen &&
+        !(mode === "conjugation" && difficulty === "guided") && (
+          <section
+            className="border-b border-zinc-800 px-4 py-3"
+            aria-label="Rules"
+          >
+            {mode === "conjugation" ? <ConjugationRules /> : <PairRules />}
+          </section>
+        )}
 
       <main className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
         {mode === "conjugation" ? (
