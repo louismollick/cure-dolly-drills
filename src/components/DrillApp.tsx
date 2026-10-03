@@ -173,6 +173,7 @@ export default function DrillApp() {
   const [mode, setMode] = useState<Mode>("conjugation");
   const [difficulty, setDifficulty] = useState<Difficulty>("guided");
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [answerDelay, setAnswerDelay] = useState(850);
   const [conjugationQuestion, setConjugationQuestion] = useState(
     makeConjugationQuestion,
   );
@@ -234,10 +235,10 @@ export default function DrillApp() {
           setLocked(false);
           timeoutRef.current = null;
         },
-        wasCorrect ? 650 : 1050,
+        wasCorrect ? answerDelay : answerDelay + 400,
       );
     },
-    [locked],
+    [answerDelay, locked],
   );
 
   const conjugationOptions = useMemo(() => {
@@ -259,11 +260,13 @@ export default function DrillApp() {
         direction: "self" as const,
         word: pair.self,
         ending: pair.selfEnding,
+        gloss: pair.selfGloss,
       },
       {
         direction: "other" as const,
         word: pair.other,
         ending: pair.otherEnding,
+        gloss: pair.otherGloss,
       },
     ];
 
@@ -397,6 +400,23 @@ export default function DrillApp() {
               <option value="recall">Recall</option>
             </select>
 
+            <label className="sr-only" htmlFor="answer-delay">
+              Delay between questions
+            </label>
+            <select
+              id="answer-delay"
+              aria-label="Delay between questions"
+              title="Delay between questions"
+              className="h-8 rounded-sm border border-zinc-700 bg-black px-2 text-xs text-white outline-none focus:border-white"
+              value={answerDelay}
+              onChange={(event) => setAnswerDelay(Number(event.target.value))}
+            >
+              <option value="650">0.65s</option>
+              <option value="850">0.85s</option>
+              <option value="1200">1.2s</option>
+              <option value="1600">1.6s</option>
+            </select>
+
             <Button
               aria-expanded={rulesOpen}
               className="h-8 px-2"
@@ -487,7 +507,10 @@ export default function DrillApp() {
               {pairOptions.map((option, index) => (
                 <Button
                   key={option.direction}
-                  className="h-20 flex-col gap-1"
+                  className={cn(
+                    "flex-col gap-1",
+                    locked ? "h-24" : "h-20",
+                  )}
                   disabled={locked}
                   variant="outline"
                   onClick={() => answerPair(option.direction)}
@@ -497,6 +520,11 @@ export default function DrillApp() {
                       ? `〜${option.ending}`
                       : option.word}
                   </span>
+                  {locked && (
+                    <span className="max-w-full whitespace-normal text-center text-xs font-normal leading-snug text-zinc-400">
+                      {option.gloss}
+                    </span>
+                  )}
                   <span className="text-[10px] font-normal text-zinc-600">
                     {index + 1}
                   </span>
