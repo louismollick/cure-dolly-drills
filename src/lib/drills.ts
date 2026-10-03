@@ -11,7 +11,6 @@ export type RowKey = (typeof ROWS)[number]["key"];
 export type ConjugationTarget =
   | "negative"
   | "polite"
-  | "dictionary"
   | "potential"
   | "volitional";
 
@@ -21,7 +20,6 @@ export const TARGETS: Record<
 > = {
   negative: { label: "NO", row: "a", suffix: "ない" },
   polite: { label: "POLITE", row: "i", suffix: "ます" },
-  dictionary: { label: "NORMAL", row: "u", suffix: "" },
   potential: { label: "CAN", row: "e", suffix: "る" },
   volitional: { label: "LET'S", row: "o", suffix: "う" },
 };
