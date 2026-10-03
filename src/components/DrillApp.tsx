@@ -51,6 +51,14 @@ type Feedback = {
   selected: string;
 };
 
+type ConjugationOption = {
+  row: RowKey;
+  rowKana: string;
+  ending: string;
+  rowLabel: string;
+  meaningLabel: string;
+};
+
 const targetKeys = Object.keys(TARGETS) as ConjugationTarget[];
 
 const CONJUGATION_RULE_EXAMPLES: Record<
@@ -117,7 +125,9 @@ function makeConjugationQuestion(
 
   do {
     const useNonGodan = difficulty === "recall" && Math.random() < 0.22;
-    const pool = useNonGodan ? NON_GODAN_VERBS : GODAN_VERBS;
+    const pool: readonly ConjugationVerb[] = useNonGodan
+      ? NON_GODAN_VERBS
+      : GODAN_VERBS;
 
     next = {
       verb: randomItem(pool),
@@ -327,7 +337,7 @@ export default function DrillApp() {
   const conjugationOptions = useMemo(() => {
     const { verb } = conjugationQuestion;
 
-    const options = isGodanVerb(verb)
+    const options: ConjugationOption[] = isGodanVerb(verb)
       ? ROWS.filter((row) => row.key !== "u").map((row) => ({
           row: row.key,
           rowKana: rowKana(verb, row.key),
