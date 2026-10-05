@@ -402,10 +402,13 @@ export default function DrillApp() {
       const { pair, target } = pairQuestion;
       const wasCorrect = direction === target;
       const answer = target === "self" ? pair.self : pair.other;
+      const reading =
+        target === "self" ? pair.selfReading : pair.otherReading;
 
       finishAnswer({
         wasCorrect,
         answer,
+        reading,
         detail: PAIR_RULE_LABELS[pair.rule],
         selected: direction,
         next: () => setPairQuestion((current) => makePairQuestion(current)),
@@ -499,22 +502,28 @@ export default function DrillApp() {
                 <option value="recall">Recall</option>
               </select>
 
-              <label className="sr-only" htmlFor="answer-delay">
-                Delay between questions
-              </label>
-              <select
-                id="answer-delay"
-                aria-label="Delay between questions"
-                title="Delay between questions"
-                className="h-10 rounded-sm border border-zinc-700 bg-black px-3 text-sm text-white outline-none focus:border-white"
-                value={answerDelay}
-                onChange={(event) => setAnswerDelay(Number(event.target.value))}
-              >
-                <option value="650">0.65s</option>
-                <option value="850">0.85s</option>
-                <option value="1200">1.2s</option>
-                <option value="1600">1.6s</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <label
+                  className="whitespace-nowrap text-sm tabular-nums text-zinc-400"
+                  htmlFor="answer-delay"
+                >
+                  {(answerDelay / 1000).toFixed(2)}s
+                </label>
+                <input
+                  id="answer-delay"
+                  aria-label="Delay between questions"
+                  title="Delay between questions"
+                  type="range"
+                  min="300"
+                  max="3000"
+                  step="50"
+                  value={answerDelay}
+                  onChange={(event) =>
+                    setAnswerDelay(Number(event.target.value))
+                  }
+                  className="h-2 w-32 cursor-pointer accent-white"
+                />
+              </div>
 
               <Button
                 aria-expanded={rulesOpen}
