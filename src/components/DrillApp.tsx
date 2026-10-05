@@ -51,6 +51,18 @@ type Feedback = {
   selected: string;
 };
 
+type ConjugationReview = {
+  question: ConjugationQuestion;
+  difficulty: Difficulty;
+  feedback: Feedback;
+};
+
+type PairReview = {
+  question: PairQuestion;
+  difficulty: Difficulty;
+  feedback: Feedback;
+};
+
 type ConjugationOption = {
   row: RowKey;
   rowKana: string;
@@ -249,6 +261,10 @@ export default function DrillApp() {
   );
   const [pairQuestion, setPairQuestion] = useState(makePairQuestion);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [lastConjugationReview, setLastConjugationReview] =
+    useState<ConjugationReview | null>(null);
+  const [lastPairReview, setLastPairReview] = useState<PairReview | null>(null);
+  const [reviewingPrevious, setReviewingPrevious] = useState(false);
   const [locked, setLocked] = useState(false);
   const [correct, setCorrect] = useState(0);
   const [wrong, setWrong] = useState(0);
@@ -267,6 +283,7 @@ export default function DrillApp() {
     clearPending();
     setMode(nextMode);
     setFeedback(null);
+    setReviewingPrevious(false);
     setLocked(false);
 
     if (nextMode === "conjugation" && difficulty === "guided") {
@@ -278,6 +295,7 @@ export default function DrillApp() {
     clearPending();
     setDifficulty(nextDifficulty);
     setFeedback(null);
+    setReviewingPrevious(false);
     setLocked(false);
     setConjugationQuestion((current) =>
       makeConjugationQuestion(current, nextDifficulty),
@@ -334,8 +352,25 @@ export default function DrillApp() {
     [answerDelay, locked],
   );
 
+  const activeReview =
+    mode === "conjugation" ? lastConjugationReview : lastPairReview;
+  const displayDifficulty =
+    reviewingPrevious && activeReview ? activeReview.difficulty : difficulty;
+  const displayFeedback =
+    reviewingPrevious && activeReview ? activeReview.feedback : feedback;
+  const displayLocked = reviewingPrevious ? true : locked;
+
+  const displayConjugationQuestion =
+    reviewingPrevious && mode === "conjugation" && lastConjugationReview
+      ? lastConjugationReview.question
+      : conjugationQuestion;
+  const displayPairQuestion =
+    reviewingPrevious && mode === "pairs" && lastPairReview
+      ? lastPairReview.question
+      : pairQuestion;
+
   const conjugationOptions = useMemo(() => {
-    const { verb } = conjugationQuestion;
+    const { verb } = displayConjugationQuestion;
 
     const options: ConjugationOption[] = isGodanVerb(verb)
       ? ROWS.filter((row) => row.key !== "u").map((row) => ({
@@ -353,11 +388,11 @@ export default function DrillApp() {
           meaningLabel: TARGETS[target].label,
         }));
 
-    return difficulty === "recall" ? shuffle(options) : options;
-  }, [conjugationQuestion, difficulty]);
+    return displayDifficulty === "recall" ? shuffle(options) : options;
+  }, [displayConjugationQuestion, displayDifficulty]);
 
   const pairOptions = useMemo(() => {
-    const { pair } = pairQuestion;
+    const { pair } = displayPairQuestion;
     const full = [
       {
         direction: "self" as const,
@@ -374,7 +409,7 @@ export default function DrillApp() {
     ];
 
     return shuffle(full);
-  }, [pairQuestion]);
+  }, [displayPairQuestion]);
 
   const answerConjugation = useCallback(
     (row: RowKey) => {
@@ -382,11 +417,28 @@ export default function DrillApp() {
       const expected = TARGETS[target].row;
       const wasCorrect = row === expected;
 
+      const answer = conjugateVerb(verb, target);
+      const reading = conjugateReading(verb, target);
+      const detail = conjugationDetail(verb, target);
+      const answerFeedback: Feedback = {
+        correct: wasCorrect,
+        answer,
+        reading,
+        detail,
+        selected: row,
+      };
+
+      setLastConjugationReview({
+        question: conjugationQuestion,
+        difficulty,
+        feedback: answerFeedback,
+      });
+
       finishAnswer({
         wasCorrect,
-        answer: conjugateVerb(verb, target),
-        reading: conjugateReading(verb, target),
-        detail: conjugationDetail(verb, target),
+        answer,
+        reading,
+        detail,
         selected: row,
         next: () =>
           setConjugationQuestion((current) =>
@@ -405,16 +457,31 @@ export default function DrillApp() {
       const reading =
         target === "self" ? pair.selfReading : pair.otherReading;
 
+      const detail = PAIR_RULE_LABELS[pair.rule];
+      const answerFeedback: Feedback = {
+        correct: wasCorrect,
+        answer,
+        reading,
+        detail,
+        selected: direction,
+      };
+
+      setLastPairReview({
+        question: pairQuestion,
+        difficulty,
+        feedback: answerFeedback,
+      });
+
       finishAnswer({
         wasCorrect,
         answer,
         reading,
-        detail: PAIR_RULE_LABELS[pair.rule],
+        detail,
         selected: direction,
         next: () => setPairQuestion((current) => makePairQuestion(current)),
       });
     },
-    [finishAnswer, pairQuestion],
+    [difficulty, finishAnswer, pairQuestion],
   );
 
   useEffect(() => {
@@ -425,6 +492,8 @@ export default function DrillApp() {
         setRulesOpen((value) => !value);
         return;
       }
+
+      if (reviewingPrevious) return;
 
       const index = Number(event.key) - 1;
       if (!Number.isInteger(index) || index < 0) return;
@@ -447,6 +516,7 @@ export default function DrillApp() {
     conjugationOptions,
     mode,
     pairOptions,
+    reviewingPrevious,
   ]);
 
   const attempts = correct + wrong;
@@ -482,6 +552,16 @@ export default function DrillApp() {
             </Button>
 
             <div className="ml-auto flex items-center gap-3">
+              <Button
+                className="h-10 px-3 text-sm"
+                size="sm"
+                variant="ghost"
+                disabled={!reviewingPrevious && (!activeReview || locked)}
+                onClick={() => setReviewingPrevious((value) => !value)}
+              >
+                {reviewingPrevious ? "Current" : "Back"}
+              </Button>
+
               <span className="hidden text-sm tabular-nums text-zinc-500 sm:inline">
                 {attempts === 0 ? "0/0" : `${correct}/${attempts}`}
               </span>
@@ -551,13 +631,13 @@ export default function DrillApp() {
           {mode === "conjugation" ? (
             <section className="text-center" aria-live="polite">
               <div className="text-[clamp(1.5rem,2.3vw,2.25rem)] font-medium">
-                {TARGETS[conjugationQuestion.target].label}
+                {TARGETS[displayConjugationQuestion.target].label}
               </div>
               <div className="mt-6 text-[clamp(4rem,8vw,7.5rem)] font-semibold leading-none tracking-tight">
-                {conjugationQuestion.verb.word}
+                {displayConjugationQuestion.verb.word}
               </div>
               <div className="mt-5 text-[clamp(1.15rem,2vw,1.6rem)] text-zinc-400">
-                {conjugationQuestion.verb.meaning}
+                {displayConjugationQuestion.verb.meaning}
               </div>
 
               <div className="mt-12 grid grid-cols-4 gap-4">
@@ -566,24 +646,24 @@ export default function DrillApp() {
                     key={option.row}
                     className={cn(
                       "h-32 min-w-0 flex-col gap-2 px-2 lg:h-36",
-                      locked &&
-                        feedback &&
-                        !feedback.correct &&
-                        feedback.selected === option.row &&
+                      displayLocked &&
+                        displayFeedback &&
+                        !displayFeedback.correct &&
+                        displayFeedback.selected === option.row &&
                         "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
                     )}
-                    disabled={locked}
+                    disabled={displayLocked}
                     variant="outline"
                     onClick={() => answerConjugation(option.row)}
                     aria-label={`Answer ${index + 1}: ${option.ending}`}
                   >
-                    {difficulty === "guided" && (
+                    {displayDifficulty === "guided" && (
                       <span className="text-sm font-normal text-zinc-500 lg:text-base">
                         {option.rowLabel} · {option.meaningLabel}
                       </span>
                     )}
                     <span className="text-[clamp(2rem,4vw,3.5rem)] font-normal leading-none">
-                      {difficulty === "guided"
+                      {displayDifficulty === "guided"
                         ? option.ending
                         : option.rowKana}
                     </span>
@@ -597,24 +677,24 @@ export default function DrillApp() {
           ) : (
             <section className="text-center" aria-live="polite">
               <div className="text-[clamp(1.4rem,2.2vw,2rem)] font-medium">
-                {pairQuestion.target === "self"
-                  ? pairQuestion.pair.selfGloss
-                  : pairQuestion.pair.otherGloss}
-                {difficulty === "guided" && (
+                {displayPairQuestion.target === "self"
+                  ? displayPairQuestion.pair.selfGloss
+                  : displayPairQuestion.pair.otherGloss}
+                {displayDifficulty === "guided" && (
                   <span className="text-zinc-500">
                     {" "}
-                    · {pairQuestion.target.toUpperCase()}
+                    · {displayPairQuestion.target.toUpperCase()}
                   </span>
                 )}
               </div>
 
               <div className="mt-7 text-[clamp(4rem,8vw,7rem)] font-semibold leading-none tracking-tight">
-                {difficulty === "recall" ? `${pairQuestion.pair.stem}＿` : "?"}
+                {displayDifficulty === "recall" ? `${displayPairQuestion.pair.stem}＿` : "?"}
               </div>
 
               {difficulty === "guided" && (
                 <div className="mt-5 text-lg text-zinc-500">
-                  {PAIR_RULE_LABELS[pairQuestion.pair.rule]}
+                  {PAIR_RULE_LABELS[displayPairQuestion.pair.rule]}
                 </div>
               )}
 
@@ -624,23 +704,23 @@ export default function DrillApp() {
                     key={option.direction}
                     className={cn(
                       "flex-col gap-3 px-5",
-                      locked ? "h-44" : "h-36",
-                      locked &&
-                        feedback &&
-                        !feedback.correct &&
-                        feedback.selected === option.direction &&
+                      displayLocked ? "h-44" : "h-36",
+                      displayLocked &&
+                        displayFeedback &&
+                        !displayFeedback.correct &&
+                        displayFeedback.selected === option.direction &&
                         "border-red-500 bg-red-950/20 text-red-400 disabled:opacity-100",
                     )}
-                    disabled={locked}
+                    disabled={displayLocked}
                     variant="outline"
                     onClick={() => answerPair(option.direction)}
                   >
                     <span className="text-[clamp(2.25rem,4vw,3.5rem)] font-normal leading-none">
-                      {difficulty === "recall"
+                      {displayDifficulty === "recall"
                         ? `〜${option.ending}`
                         : option.word}
                     </span>
-                    {locked && (
+                    {displayLocked && (
                       <span className="max-w-full whitespace-normal text-center text-lg font-normal leading-snug text-zinc-400">
                         {option.gloss}
                       </span>
@@ -658,29 +738,33 @@ export default function DrillApp() {
             className="mt-10 min-h-32 text-center"
             aria-live="assertive"
           >
-            {feedback && (
-              <div className={feedback.correct ? "text-white" : "text-red-400"}>
+            {displayFeedback && (
+              <div
+                className={
+                  displayFeedback.correct ? "text-white" : "text-red-400"
+                }
+              >
                 <div className="text-[clamp(2rem,4vw,3.5rem)] font-normal leading-tight">
-                  <span className="mr-3">{feedback.correct ? "✓" : "✕"}</span>
-                  {feedback.reading ? (
+                  <span className="mr-3">{displayFeedback.correct ? "✓" : "✕"}</span>
+                  {displayFeedback.reading ? (
                     <ruby>
-                      {feedback.answer}
+                      {displayFeedback.answer}
                       <rt className="text-[0.38em] text-zinc-400">
-                        {feedback.reading}
+                        {displayFeedback.reading}
                       </rt>
                     </ruby>
                   ) : (
-                    feedback.answer
+                    displayFeedback.answer
                   )}
                 </div>
-                {feedback.detail && (
+                {displayFeedback.detail && (
                   <div
                     className={cn(
                       "mt-4 text-lg",
-                      feedback.correct ? "text-zinc-400" : "text-red-300",
+                      displayFeedback.correct ? "text-zinc-400" : "text-red-300",
                     )}
                   >
-                    {feedback.detail}
+                    {displayFeedback.detail}
                   </div>
                 )}
               </div>
