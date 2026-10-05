@@ -527,6 +527,25 @@ export default function DrillApp() {
         <header className="border-b border-zinc-800">
           <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-2 px-5 lg:px-8">
             <Button
+              aria-label={
+                reviewingPrevious
+                  ? "Return to current question"
+                  : "Review previous answer"
+              }
+              title={
+                reviewingPrevious
+                  ? "Return to current question"
+                  : "Review previous answer"
+              }
+              className="h-16 w-16 rounded-none px-0 text-4xl font-light leading-none"
+              variant="ghost"
+              disabled={!reviewingPrevious && (!activeReview || locked)}
+              onClick={() => setReviewingPrevious((value) => !value)}
+            >
+              {reviewingPrevious ? "→" : "←"}
+            </Button>
+
+            <Button
               className={cn(
                 "h-16 rounded-none border-b-2 px-4 text-lg",
                 mode === "conjugation"
@@ -552,16 +571,6 @@ export default function DrillApp() {
             </Button>
 
             <div className="ml-auto flex items-center gap-3">
-              <Button
-                className="h-10 px-3 text-sm"
-                size="sm"
-                variant="ghost"
-                disabled={!reviewingPrevious && (!activeReview || locked)}
-                onClick={() => setReviewingPrevious((value) => !value)}
-              >
-                {reviewingPrevious ? "Current" : "Back"}
-              </Button>
-
               <span className="hidden text-sm tabular-nums text-zinc-500 sm:inline">
                 {attempts === 0 ? "0/0" : `${correct}/${attempts}`}
               </span>
